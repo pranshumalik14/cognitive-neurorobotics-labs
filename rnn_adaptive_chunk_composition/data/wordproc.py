@@ -24,10 +24,9 @@ def process_svg_file(filepath, num_samples=100):
     process an svg file that contains multiple paths (repeats of the same word).
     for each path:
       - uniformly sample 'num_samples' points along the arc length
-      - convert the absolute coordinates into delta coordinates such that:
-          delta[0] = (0,0)
-          delta[i] = point[i] - point[i-1] for i>=1
-      - normalize the coordinates to [0,1] range while preserving aspect ratio
+      - convert the absolute coordinates into relative coordinates such that:
+          point[i] = point[i] - point[0] for i >= 0
+      - regularize the coordinates to a range close to [0,1] while preserving aspect ratio
     returns:
       a list of numpy arrays of shape (num_samples, 2), one for each path
     """
@@ -45,7 +44,7 @@ def process_svg_file(filepath, num_samples=100):
         print(f"No paths found in {filepath}. Skipping.")
         return None
 
-    all_deltas = []
+    all_points = []
     for path in paths:
         total_length = path.length()
         distances = np.linspace(0, total_length, num_samples)
@@ -58,15 +57,10 @@ def process_svg_file(filepath, num_samples=100):
         # regularize point range while preserving aspect ratio
         points = np.array(points)
         points /= 100
-
-        # compute delta positions: first element is (0,0)
-        # subsequent elements are differences from the previous point
-        deltas = np.zeros_like(points)
-        deltas[0] = [0, 0]
-        # use vectorized difference computation
-        deltas[1:] = points[1:] - points[:-1]
-        all_deltas.append(deltas)
-    return all_deltas
+        # compute relative positions to the first point
+        points = points - points[0]
+        all_points.append(points)
+    return all_points
 
 
 def main():
@@ -102,8 +96,8 @@ def main():
         plt.figure(figsize=(5, 5))
         # reconstruct the absolute positions from the delta representation using cumulative sum
         sample = samples[0]  # choose the first repetition for plotting
-        xs = np.cumsum(sample[:, 0])
-        ys = np.cumsum(sample[:, 1])
+        xs = sample[:, 0]
+        ys = sample[:, 1]
         plt.plot(xs, ys, marker='o', markersize=2, linestyle='-')
         plt.title(f"Word: {word}")
         plt.xlabel("X")
